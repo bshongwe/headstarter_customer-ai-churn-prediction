@@ -17,7 +17,7 @@ except Exception as e:
     st.stop()
 
 def load_model(filename):
-    """Loads model from pickle file and handles exceptions."""
+    """Loads model from a pickle file and handles exceptions."""
     try:
         with open(filename, 'rb') as file:
             return pickle.load(file)
@@ -31,15 +31,17 @@ def load_model(filename):
         st.error(f"An error occurred while loading the model: {str(e)}")
         st.stop()
 
-# Loads models at beginning
-xgboost_model = load_model('xgb_model.pkl')
-native_model = load_model('nb_model.pkl')
-random_forest_model = load_model('rf_model.pkl')
-decision_tree_model = load_model('bt_model.pkl')
-svm_model = load_model('svm_model.pkl')
-knn_model = load_model('knn_model.pkl')
-voting_classifiers_model = load_model('voting_Clf.pkl')
-xgboost_SMOTE_model = load_model('xgboost_featureEngineered.pkl')
+# Loads models at the beginning
+models = {
+    'XGBoost': load_model('xgb_model.pkl'),
+    'Random Forest': load_model('rf_model.pkl'),
+    'K-Nearest Neighbors': load_model('knn_model.pkl'),
+    'Voting Classifier': load_model('voting_Clf.pkl'),
+    'SVM': load_model('svm_model.pkl'),
+    'Decision Tree': load_model('bt_model.pkl'),
+    'Naive Bayes': load_model('nb_model.pkl'),
+    'XGBoost with SMOTE': load_model('xgboost_featureEngineered.pkl')
+}
 
 def prepare_input(credit_score, location, gender, age, tenure, balance,
                   num_of_products, has_credit_history, is_active_member, estimated_salary):
@@ -53,11 +55,11 @@ def prepare_input(credit_score, location, gender, age, tenure, balance,
         'HasCrCard': int(has_credit_history),
         'IsActiveMember': int(is_active_member),
         'EstimatedSalary': estimated_salary,
-        'Geography_France': 1 if location == 'France' else 0,
-        'Geography_Germany': 1 if location == 'Germany' else 0,
-        'Geography_Spain': 1 if location == 'Spain' else 0,
-        'Gender_Male': 1 if gender == 'Male' else 0,
-        'Gender_Female': 1 if gender == 'Female' else 0,
+        'Geography_France': int(location == 'France'),
+        'Geography_Germany': int(location == 'Germany'),
+        'Geography_Spain': int(location == 'Spain'),
+        'Gender_Male': int(gender == 'Male'),
+        'Gender_Female': int(gender == 'Female'),
     }
     return pd.DataFrame([input_dict]), input_dict
 
@@ -75,13 +77,11 @@ def calculate_customer_percentiles(df, selected_customer):
         st.error(f"Error calculating percentiles: {str(e)}")
         st.stop()
 
-def make_prediction(input_df, input_dict):
-    """Makes predictions using multiple models and display results."""
+def make_prediction(input_df):
+    """Makes predictions using multiple models and displays results."""
     try:
         probabilities = {
-            'XGBoost': xgboost_model.predict_proba(input_df)[0][1],
-            'Random Forest': random_forest_model.predict_proba(input_df)[0][1],
-            'K-Nearest Neighbors': knn_model.predict_proba(input_df)[0][1],
+            model_name: model.predict_proba(input_df)[0][1] for model_name, model in models.items()
         }
         avg_probability = np.mean(list(probabilities.values()))
 
@@ -103,7 +103,8 @@ def explain_prediction(probability, input_dict, surname):
     """Generates explanation for prediction using OpenAI API."""
     try:
         prompt = f"""
-        You are an expert data scientist at a bank... (Prompt truncated for brevity)
+        You are an expert data scientist at a bank. Please provide an explanation for the churn prediction based on the following input:
+        {input_dict} with a predicted probability of churn: {probability:.2%}.
         """
         raw_response = client.chat.completions.create(
             model="llama-3.2-3b-preview",
@@ -118,7 +119,10 @@ def generate_email(probability, input_dict, explanation, surname):
     """Generates personalized email for customer using OpenAI API."""
     try:
         prompt = f"""
-        As a manager at HS Bank... (Prompt truncated for brevity)
+        As a manager at HS Bank, please generate a personalized email for the customer based on the following details:
+        Probability of churn: {probability:.2%}
+        Explanation: {explanation}
+        Customer Input: {input_dict}
         """
         raw_response = client.chat.completions.create(
             model="llama-3.1-8b-instant",
@@ -132,6 +136,7 @@ def generate_email(probability, input_dict, explanation, surname):
 st.title("📊 Customer Churn Prediction")
 st.markdown("<hr style='border:1px solid #ddd;'>", unsafe_allow_html=True)
 
+# Load customer data
 try:
     df = pd.read_csv("churn.csv")
 except FileNotFoundError:
@@ -152,24 +157,21 @@ if selected_customer_option:
     selected_customer = df.loc[df["CustomerId"] == selected_customer_id].iloc[0]
 
     # Collects customer details and prepares input
-    credit_score = selected_customer['CreditScore']
-    location = selected_customer['Geography']
-    gender = selected_customer['Gender']
-    age = selected_customer['Age']
-    tenure = selected_customer['Tenure']
-    balance = selected_customer['Balance']
-    num_products = selected_customer['NumOfProducts']
-    has_credit_card = selected_customer['HasCrCard']
-    is_active_member = selected_customer['IsActiveMember']
-    estimated_salary = selected_customer['EstimatedSalary']
-
     input_df, input_dict = prepare_input(
-        credit_score, location, gender, age, tenure, balance,
-        num_products, has_credit_card, is_active_member, estimated_salary
+        selected_customer['CreditScore'],
+        selected_customer['Geography'],
+        selected_customer['Gender'],
+        selected_customer['Age'],
+        selected_customer['Tenure'],
+        selected_customer['Balance'],
+        selected_customer['NumOfProducts'],
+        selected_customer['HasCrCard'],
+        selected_customer['IsActiveMember'],
+        selected_customer['EstimatedSalary']
     )
 
     if st.button("Predict Churn"):
-        avg_probability = make_prediction(input_df, input_dict)
+        avg_probability = make_prediction(input_df)
         if avg_probability is not None:
             percentiles = calculate_customer_percentiles(df, selected_customer)
             fig_percentiles = ut.create_percentile_bar_chart(percentiles)
@@ -182,3 +184,4 @@ if selected_customer_option:
             email = generate_email(avg_probability, input_dict, explanation, selected_customer["Surname"])
             st.subheader("📧 Personalized Email")
             st.markdown(email)
+
