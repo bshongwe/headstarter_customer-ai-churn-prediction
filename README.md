@@ -106,12 +106,4 @@ Describe how to use your application, including how to access the web app and an
 
 ## 🗝️ License
 
-Include licensing information for your project.
-
-```
-
-### Final Touches
-
-- **URLs**: Replace placeholder URLs with the actual links for your repository and deployed application.
-- **Installation and Usage**: Ensure the installation and usage sections are clear and provide all necessary details for users to get started.
-- **License**: Make sure to include the license information relevant to your project.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
