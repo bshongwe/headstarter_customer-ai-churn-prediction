@@ -1,0 +1,23 @@
+# Streamlit for app deployment
+streamlit==1.26.0
+
+# Core data science libraries
+pandas==2.1.1
+numpy==1.24.3
+
+# Machine learning libraries
+scikit-learn==1.3.0
+xgboost==1.7.6
+
+# Plotting libraries for visualizations
+plotly==5.15.0
+matplotlib==3.8.1
+
+# OpenAI library for API integration
+openai==0.29.0
+
+# Utility libraries
+requests==2.31.0
+
+# For data and model serialization
+pickle5==0.0.12
