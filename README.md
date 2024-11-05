@@ -93,7 +93,7 @@ cd headstarter_customer-ai-churn-prediction
 pip install -r requirements.txt
 
 # Run the application
-streamlit run app.py
+streamlit run main.py
 ```
 
 ---
